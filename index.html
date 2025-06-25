@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reversible Two-Dimensional Markov Process Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Reversible Two-Dimensional Markov Process</h1>
+            <p>Interactive simulation dashboard based on "Notes on the Stationary Distribution for a Reversible Two-Dimensional Process"</p>
+            
+            <div class="model-description">
+                <h3>Model Description</h3>
+                <p>This system models a continuous-time Markov chain on state space (x, y) representing the sizes of "red" and "blue" populations. 
+                The process evolves through four types of transitions: arrivals to and departures from each population, with rates that depend on the current state.</p>
+                
+                <div class="equations">
+                    <p><strong>Transition Rates:</strong></p>
+                    <ul>
+                        <li><strong>Red arrivals:</strong> λ₁(x,y) = α₁(β₁+x)/(γ+x+y)</li>
+                        <li><strong>Blue arrivals:</strong> λ₂(x,y) = α₂(β₂+y)/(γ+x+y)</li>
+                        <li><strong>Red departures:</strong> μ₁(x,y) = x·δ₁(γ̂+x+y)/(β̂₁+x)</li>
+                        <li><strong>Blue departures:</strong> μ₂(x,y) = y·δ₂(γ̂+x+y)/(β̂₂+y)</li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Parameter Controls -->
+            <div class="panel parameters-panel">
+                <h2>Parameters</h2>
+                <div class="parameter-info">
+                    <p><strong>Parameter Descriptions:</strong></p>
+                    <ul>
+                        <li><strong>α₁, α₂:</strong> Base arrival intensities for red and blue populations</li>
+                        <li><strong>β₁, β₂:</strong> Enhancement factors that increase arrival rates with population size</li>
+                        <li><strong>γ:</strong> Competition factor that decreases arrival rates as total population grows</li>
+                        <li><strong>δ₁, δ₂:</strong> Base departure intensities (per capita rates)</li>
+                        <li><strong>β̂₁, β̂₂:</strong> Enhancement factors that affect departure rate scaling</li>
+                        <li><strong>γ̂:</strong> Environmental factor that increases departure rates with total population</li>
+                    </ul>
+                </div>
+                <div class="parameter-grid">
+                    <div class="param-group">
+                        <h3>Arrival Parameters</h3>
+                        <div class="param-item">
+                            <label for="alpha1">α₁:</label>
+                            <input type="number" id="alpha1" value="2.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="alpha2">α₂:</label>
+                            <input type="number" id="alpha2" value="1.5" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="beta1">β₁:</label>
+                            <input type="number" id="beta1" value="1.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="beta2">β₂:</label>
+                            <input type="number" id="beta2" value="1.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="gamma">γ:</label>
+                            <input type="number" id="gamma" value="2.0" step="0.1" min="0.1">
+                        </div>
+                    </div>
+
+                    <div class="param-group">
+                        <h3>Departure Parameters</h3>
+                        <div class="param-item">
+                            <label for="delta1">δ₁:</label>
+                            <input type="number" id="delta1" value="1.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="delta2">δ₂:</label>
+                            <input type="number" id="delta2" value="0.8" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="beta1_hat">β̂₁:</label>
+                            <input type="number" id="beta1_hat" value="2.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="beta2_hat">β̂₂:</label>
+                            <input type="number" id="beta2_hat" value="2.0" step="0.1" min="0.1">
+                        </div>
+                        <div class="param-item">
+                            <label for="gamma_hat">γ̂:</label>
+                            <input type="number" id="gamma_hat" value="1.0" step="0.1" min="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="simulation-controls">
+                    <h3>Simulation Settings</h3>
+                    <div class="param-item">
+                        <label for="simTime">Simulation Time:</label>
+                        <input type="number" id="simTime" value="100" step="10" min="10">
+                    </div>
+                    <div class="param-item">
+                        <label for="burnIn">Burn-in Time:</label>
+                        <input type="number" id="burnIn" value="20" step="5" min="0">
+                    </div>
+                    <div class="param-item">
+                        <label for="maxStates">Max State (x,y):</label>
+                        <input type="number" id="maxStates" value="15" step="1" min="5">
+                    </div>
+                    <button id="runSimulation" class="btn-primary">Run Simulation</button>
+                    <button id="resetParams" class="btn-secondary">Reset Parameters</button>
+                </div>
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="panel viz-panel">
+                <h2>Results</h2>
+                <div class="tabs">
+                    <button class="tab-button active" data-tab="heatmap">Distribution Heatmap</button>
+                    <button class="tab-button" data-tab="comparison">Theory vs Simulation</button>
+                    <button class="tab-button" data-tab="trajectory">Sample Trajectory</button>
+                </div>
+
+                <div id="heatmap" class="tab-content active">
+                    <div class="plot-container">
+                        <div id="theoreticalPlot" class="plot-half">
+                            <h3>Theoretical Stationary Distribution</h3>
+                            <div id="theoreticalHeatmap"></div>
+                        </div>
+                        <div id="empiricalPlot" class="plot-half">
+                            <h3>Empirical Distribution</h3>
+                            <div id="empiricalHeatmap"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="comparison" class="tab-content">
+                    <div id="comparisonPlot"></div>
+                </div>
+
+                <div id="trajectory" class="tab-content">
+                    <div id="trajectoryPlot"></div>
+                </div>
+            </div>
+
+            <!-- Statistics Panel -->
+            <div class="panel stats-panel">
+                <h2>Statistics</h2>
+                <div id="statistics">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Variation Distance:</span>
+                        <span id="tvDistance" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Kolmogorov-Smirnov Test:</span>
+                        <span id="ksTest" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Mean Red Population:</span>
+                        <span id="meanRed" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Mean Blue Population:</span>
+                        <span id="meanBlue" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Simulation Time:</span>
+                        <span id="simDuration" class="stat-value">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Implementation of the reversible two-dimensional Markov process described in Maddalena's paper (June 25, 2025)</p>
+        </footer>
+    </div>
+
+    <div id="loading" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Running simulation...</p>
+    </div>
+
+    <script src="markov.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 
