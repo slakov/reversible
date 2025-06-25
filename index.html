@@ -3,38 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Interactive dashboard for exploring reversible two-dimensional Markov processes with real-time parameter adjustment and Monte Carlo simulation">
+    <meta name="keywords" content="Markov process, stochastic process, population dynamics, Monte Carlo simulation, reversible process">
+    <meta name="author" content="Based on Maddalena's research paper (June 25, 2025)">
+    
     <title>Reversible Two-Dimensional Markov Process Dashboard</title>
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
+    
+    <!-- External Libraries -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
 </head>
 <body>
+    <!-- Skip to main content for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
     <div class="container">
-        <header>
+        <header role="banner">
             <h1>Reversible Two-Dimensional Markov Process</h1>
-            <p>Interactive simulation dashboard based on "Notes on the Stationary Distribution for a Reversible Two-Dimensional Process"</p>
+            <p class="subtitle">Interactive simulation dashboard based on "Notes on the Stationary Distribution for a Reversible Two-Dimensional Process"</p>
             
             <div class="model-description">
-                <h3>Model Description</h3>
+                <h2>Model Description</h2>
                 <p>This system models a continuous-time Markov chain on state space (x, y) representing the sizes of "red" and "blue" populations. 
                 The process evolves through four types of transitions: arrivals to and departures from each population, with rates that depend on the current state.</p>
                 
-                <div class="equations">
+                <div class="equations" role="img" aria-label="Mathematical transition rate equations">
                     <p><strong>Transition Rates:</strong></p>
                     <ul>
-                        <li><strong>Red arrivals:</strong> λ₁(x,y) = α₁(β₁+x)/(γ+x+y)</li>
-                        <li><strong>Blue arrivals:</strong> λ₂(x,y) = α₂(β₂+y)/(γ+x+y)</li>
-                        <li><strong>Red departures:</strong> μ₁(x,y) = x·δ₁(γ̂+x+y)/(β̂₁+x)</li>
-                        <li><strong>Blue departures:</strong> μ₂(x,y) = y·δ₂(γ̂+x+y)/(β̂₂+y)</li>
+                        <li><strong>Red arrivals:</strong> <span class="equation">λ₁(x,y) = α₁(β₁+x)/(γ+x+y)</span></li>
+                        <li><strong>Blue arrivals:</strong> <span class="equation">λ₂(x,y) = α₂(β₂+y)/(γ+x+y)</span></li>
+                        <li><strong>Red departures:</strong> <span class="equation">μ₁(x,y) = x·δ₁(γ̂+x+y)/(β̂₁+x)</span></li>
+                        <li><strong>Blue departures:</strong> <span class="equation">μ₂(x,y) = y·δ₂(γ̂+x+y)/(β̂₂+y)</span></li>
                     </ul>
                 </div>
             </div>
         </header>
 
-        <div class="main-content">
+        <main id="main-content" class="main-content" role="main">
             <!-- Parameter Controls -->
-            <div class="panel parameters-panel">
-                <h2>Parameters</h2>
+            <section class="panel parameters-panel" aria-labelledby="parameters-heading">
+                <h2 id="parameters-heading">Model Parameters</h2>
                 <div class="parameter-info">
                     <p><strong>Parameter Descriptions:</strong></p>
                     <ul>
@@ -46,159 +57,279 @@
                         <li><strong>γ̂:</strong> Environmental factor that increases departure rates with total population</li>
                     </ul>
                 </div>
-                <div class="parameter-grid">
-                    <div class="param-group">
-                        <h3>Arrival Parameters</h3>
-                        <div class="param-item">
-                            <label for="alpha1">α₁:</label>
-                            <input type="number" id="alpha1" value="1.5" step="0.1" min="0.1">
-                        </div>
-                        <div class="param-item">
-                            <label for="alpha2">α₂:</label>
-                            <input type="number" id="alpha2" value="1.2" step="0.1" min="0.1">
-                        </div>
-                        <div class="param-item">
-                            <label for="beta1">β₁:</label>
-                            <input type="number" id="beta1" value="0.8" step="0.1" min="0.1">
-                        </div>
-                        <div class="param-item">
-                            <label for="beta2">β₂:</label>
-                            <input type="number" id="beta2" value="0.8" step="0.1" min="0.1">
-                        </div>
-                        <div class="param-item">
-                            <label for="gamma">γ:</label>
-                            <input type="number" id="gamma" value="1.5" step="0.1" min="0.1">
-                        </div>
+                
+                <form class="parameter-form" novalidate aria-describedby="parameter-validation-info">
+                    <div class="parameter-grid">
+                        <fieldset class="param-group">
+                            <legend>Arrival Parameters</legend>
+                            <div class="param-item">
+                                <label for="alpha1">α₁ (Red arrival intensity):</label>
+                                <input type="number" id="alpha1" name="alpha1" value="1.5" 
+                                       step="0.1" min="0.1" max="10" 
+                                       aria-describedby="alpha1-desc" required>
+                                <small id="alpha1-desc" class="param-description">Range: 0.1 - 10.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="alpha2">α₂ (Blue arrival intensity):</label>
+                                <input type="number" id="alpha2" name="alpha2" value="1.2" 
+                                       step="0.1" min="0.1" max="10" 
+                                       aria-describedby="alpha2-desc" required>
+                                <small id="alpha2-desc" class="param-description">Range: 0.1 - 10.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="beta1">β₁ (Red enhancement factor):</label>
+                                <input type="number" id="beta1" name="beta1" value="0.8" 
+                                       step="0.1" min="0.1" max="5" 
+                                       aria-describedby="beta1-desc" required>
+                                <small id="beta1-desc" class="param-description">Range: 0.1 - 5.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="beta2">β₂ (Blue enhancement factor):</label>
+                                <input type="number" id="beta2" name="beta2" value="0.8" 
+                                       step="0.1" min="0.1" max="5" 
+                                       aria-describedby="beta2-desc" required>
+                                <small id="beta2-desc" class="param-description">Range: 0.1 - 5.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="gamma">γ (Competition factor):</label>
+                                <input type="number" id="gamma" name="gamma" value="1.5" 
+                                       step="0.1" min="0.1" max="10" 
+                                       aria-describedby="gamma-desc" required>
+                                <small id="gamma-desc" class="param-description">Range: 0.1 - 10.0</small>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="param-group">
+                            <legend>Departure Parameters</legend>
+                            <div class="param-item">
+                                <label for="delta1">δ₁ (Red departure intensity):</label>
+                                <input type="number" id="delta1" name="delta1" value="0.9" 
+                                       step="0.1" min="0.1" max="5" 
+                                       aria-describedby="delta1-desc" required>
+                                <small id="delta1-desc" class="param-description">Range: 0.1 - 5.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="delta2">δ₂ (Blue departure intensity):</label>
+                                <input type="number" id="delta2" name="delta2" value="0.7" 
+                                       step="0.1" min="0.1" max="5" 
+                                       aria-describedby="delta2-desc" required>
+                                <small id="delta2-desc" class="param-description">Range: 0.1 - 5.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="beta1_hat">β̂₁ (Red departure enhancement):</label>
+                                <input type="number" id="beta1_hat" name="beta1_hat" value="1.2" 
+                                       step="0.1" min="0.1" max="10" 
+                                       aria-describedby="beta1-hat-desc" required>
+                                <small id="beta1-hat-desc" class="param-description">Range: 0.1 - 10.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="beta2_hat">β̂₂ (Blue departure enhancement):</label>
+                                <input type="number" id="beta2_hat" name="beta2_hat" value="1.2" 
+                                       step="0.1" min="0.1" max="10" 
+                                       aria-describedby="beta2-hat-desc" required>
+                                <small id="beta2-hat-desc" class="param-description">Range: 0.1 - 10.0</small>
+                            </div>
+                            <div class="param-item">
+                                <label for="gamma_hat">γ̂ (Environmental pressure):</label>
+                                <input type="number" id="gamma_hat" name="gamma_hat" value="0.8" 
+                                       step="0.1" min="0.1" max="5" 
+                                       aria-describedby="gamma-hat-desc" required>
+                                <small id="gamma-hat-desc" class="param-description">Range: 0.1 - 5.0</small>
+                            </div>
+                        </fieldset>
                     </div>
 
-                    <div class="param-group">
-                        <h3>Departure Parameters</h3>
+                    <div class="simulation-controls">
+                        <h3>Simulation Settings</h3>
                         <div class="param-item">
-                            <label for="delta1">δ₁:</label>
-                            <input type="number" id="delta1" value="0.9" step="0.1" min="0.1">
+                            <label for="simTime">Simulation Time (time units):</label>
+                            <input type="number" id="simTime" name="simTime" value="200" 
+                                   step="10" min="10" max="10000" 
+                                   aria-describedby="simTime-desc" required>
+                            <small id="simTime-desc" class="param-description">Range: 10 - 10,000</small>
                         </div>
                         <div class="param-item">
-                            <label for="delta2">δ₂:</label>
-                            <input type="number" id="delta2" value="0.7" step="0.1" min="0.1">
+                            <label for="burnIn">Burn-in Time (time units):</label>
+                            <input type="number" id="burnIn" name="burnIn" value="50" 
+                                   step="5" min="0" max="1000" 
+                                   aria-describedby="burnIn-desc" required>
+                            <small id="burnIn-desc" class="param-description">Range: 0 - 1,000</small>
                         </div>
                         <div class="param-item">
-                            <label for="beta1_hat">β̂₁:</label>
-                            <input type="number" id="beta1_hat" value="1.2" step="0.1" min="0.1">
+                            <label for="maxStates">Max State Size (x,y):</label>
+                            <input type="number" id="maxStates" name="maxStates" value="12" 
+                                   step="1" min="5" max="50" 
+                                   aria-describedby="maxStates-desc" required>
+                            <small id="maxStates-desc" class="param-description">Range: 5 - 50</small>
                         </div>
-                        <div class="param-item">
-                            <label for="beta2_hat">β̂₂:</label>
-                            <input type="number" id="beta2_hat" value="1.2" step="0.1" min="0.1">
+                        
+                        <div class="button-group">
+                            <button type="button" id="runSimulation" class="btn-primary" 
+                                    aria-describedby="run-simulation-desc">
+                                <span class="button-text">Run Simulation</span>
+                                <span class="button-shortcut">(Ctrl+Enter)</span>
+                            </button>
+                            <button type="button" id="resetParams" class="btn-secondary"
+                                    aria-describedby="reset-params-desc">
+                                <span class="button-text">Reset Parameters</span>
+                                <span class="button-shortcut">(Ctrl+R)</span>
+                            </button>
                         </div>
-                        <div class="param-item">
-                            <label for="gamma_hat">γ̂:</label>
-                            <input type="number" id="gamma_hat" value="0.8" step="0.1" min="0.1">
+                        
+                        <small id="run-simulation-desc" class="help-text">
+                            Starts Monte Carlo simulation with current parameters
+                        </small>
+                        <small id="reset-params-desc" class="help-text">
+                            Resets all parameters to default values
+                        </small>
+                        
+                        <div class="parameter-tips">
+                            <h4>💡 Tips for Good Convergence</h4>
+                            <ul>
+                                <li><strong>Balance:</strong> Keep α₁/δ₁ ≈ α₂/δ₂ for symmetric populations</li>
+                                <li><strong>Stability:</strong> Ensure departure rates can handle arrivals</li>
+                                <li><strong>Time:</strong> Use longer simulation time for better convergence</li>
+                                <li><strong>Burn-in:</strong> Allow sufficient time to reach stationarity</li>
+                            </ul>
+                        </div>
+                        
+                        <div id="parameter-validation-info" class="validation-info" aria-live="polite">
+                            <!-- Parameter validation messages will appear here -->
                         </div>
                     </div>
-                </div>
-
-                <div class="simulation-controls">
-                    <h3>Simulation Settings</h3>
-                    <div class="param-item">
-                        <label for="simTime">Simulation Time:</label>
-                        <input type="number" id="simTime" value="200" step="10" min="10">
-                    </div>
-                    <div class="param-item">
-                        <label for="burnIn">Burn-in Time:</label>
-                        <input type="number" id="burnIn" value="50" step="5" min="0">
-                    </div>
-                    <div class="param-item">
-                        <label for="maxStates">Max State (x,y):</label>
-                        <input type="number" id="maxStates" value="12" step="1" min="5">
-                    </div>
-                    <button id="runSimulation" class="btn-primary">Run Simulation</button>
-                    <button id="resetParams" class="btn-secondary">Reset Parameters</button>
-                    
-                    <div class="parameter-tips">
-                        <h4>💡 Tips for Good Convergence</h4>
-                        <ul>
-                            <li><strong>Balance:</strong> Keep α₁/δ₁ ≈ α₂/δ₂ for symmetric populations</li>
-                            <li><strong>Stability:</strong> Ensure departure rates can handle arrivals</li>
-                            <li><strong>Time:</strong> Use longer simulation time for better convergence</li>
-                            <li><strong>Burn-in:</strong> Allow sufficient time to reach stationarity</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+                </form>
+            </section>
 
             <!-- Visualization Panel -->
-            <div class="panel viz-panel">
-                <h2>Results</h2>
-                <div class="tabs">
-                    <button class="tab-button active" data-tab="heatmap">Distribution Heatmap</button>
-                    <button class="tab-button" data-tab="comparison">Theory vs Simulation</button>
-                    <button class="tab-button" data-tab="trajectory">Sample Trajectory</button>
+            <section class="panel viz-panel" aria-labelledby="results-heading">
+                <h2 id="results-heading">Simulation Results</h2>
+                <div class="tabs" role="tablist" aria-label="Visualization options">
+                    <button class="tab-button active" role="tab" 
+                            aria-selected="true" aria-controls="heatmap" 
+                            data-tab="heatmap" id="tab-heatmap">
+                        Distribution Heatmap
+                    </button>
+                    <button class="tab-button" role="tab" 
+                            aria-selected="false" aria-controls="comparison" 
+                            data-tab="comparison" id="tab-comparison">
+                        Theory vs Simulation
+                    </button>
+                    <button class="tab-button" role="tab" 
+                            aria-selected="false" aria-controls="trajectory" 
+                            data-tab="trajectory" id="tab-trajectory">
+                        Sample Trajectory
+                    </button>
                 </div>
 
-                <div id="heatmap" class="tab-content active">
+                <div id="heatmap" class="tab-content active" role="tabpanel" 
+                     aria-labelledby="tab-heatmap" aria-hidden="false">
                     <div class="plot-container">
                         <div id="theoreticalPlot" class="plot-half">
                             <h3>Theoretical Stationary Distribution</h3>
-                            <div id="theoreticalHeatmap"></div>
+                            <div id="theoreticalHeatmap" role="img" 
+                                 aria-label="Heatmap showing theoretical probability distribution"></div>
                         </div>
                         <div id="empiricalPlot" class="plot-half">
                             <h3>Empirical Distribution</h3>
-                            <div id="empiricalHeatmap"></div>
+                            <div id="empiricalHeatmap" role="img" 
+                                 aria-label="Heatmap showing empirical probability distribution from simulation"></div>
                         </div>
                     </div>
                 </div>
 
-                <div id="comparison" class="tab-content">
-                    <div id="comparisonPlot"></div>
+                <div id="comparison" class="tab-content" role="tabpanel" 
+                     aria-labelledby="tab-comparison" aria-hidden="true">
+                    <div id="comparisonPlot" role="img" 
+                         aria-label="Scatter plot comparing theoretical vs empirical probabilities"></div>
                 </div>
 
-                <div id="trajectory" class="tab-content">
-                    <div id="trajectoryPlot"></div>
+                <div id="trajectory" class="tab-content" role="tabpanel" 
+                     aria-labelledby="tab-trajectory" aria-hidden="true">
+                    <div id="trajectoryPlot" role="img" 
+                         aria-label="Line plot showing sample trajectory through state space"></div>
                 </div>
-            </div>
+            </section>
 
             <!-- Statistics Panel -->
-            <div class="panel stats-panel">
-                <h2>Statistics</h2>
-                <div id="statistics">
-                    <div class="stat-item">
+            <section class="panel stats-panel" aria-labelledby="statistics-heading">
+                <h2 id="statistics-heading">Simulation Statistics</h2>
+                <div id="statistics" role="list" aria-label="Key simulation metrics">
+                    <div class="stat-item" role="listitem">
                         <span class="stat-label">Total Variation Distance:</span>
-                        <span id="tvDistance" class="stat-value">-</span>
+                        <span id="tvDistance" class="stat-value" aria-label="Convergence quality metric">-</span>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" role="listitem">
                         <span class="stat-label">Convergence Quality:</span>
-                        <span id="convergenceQuality" class="stat-value">-</span>
+                        <span id="convergenceQuality" class="stat-value" aria-label="Overall assessment">-</span>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" role="listitem">
                         <span class="stat-label">Mean Red Population:</span>
-                        <span id="meanRed" class="stat-value">-</span>
+                        <span id="meanRed" class="stat-value" aria-label="Average red population size">-</span>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" role="listitem">
                         <span class="stat-label">Mean Blue Population:</span>
-                        <span id="meanBlue" class="stat-value">-</span>
+                        <span id="meanBlue" class="stat-value" aria-label="Average blue population size">-</span>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" role="listitem">
                         <span class="stat-label">Sample Count:</span>
-                        <span id="sampleCount" class="stat-value">-</span>
+                        <span id="sampleCount" class="stat-value" aria-label="Number of simulation samples">-</span>
                     </div>
-                    <div class="stat-item">
+                    <div class="stat-item" role="listitem">
                         <span class="stat-label">Simulation Time:</span>
-                        <span id="simDuration" class="stat-value">-</span>
+                        <span id="simDuration" class="stat-value" aria-label="Computational time">-</span>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
+        </main>
 
-        <footer>
+        <footer role="contentinfo">
             <p>Implementation of the reversible two-dimensional Markov process described in Maddalena's paper (June 25, 2025)</p>
+            <p class="footer-links">
+                <a href="#" onclick="alert('Keyboard shortcuts: Ctrl+Enter (Run), Ctrl+R (Reset), 1-3 (Switch tabs)')">
+                    Keyboard Shortcuts
+                </a>
+                <span class="separator">|</span>
+                <a href="#" onclick="alert('Browser requirements: Modern browser with ES6 support, WebGL for visualizations')">
+                    System Requirements
+                </a>
+            </p>
         </footer>
     </div>
 
-    <div id="loading" class="loading-overlay">
-        <div class="spinner"></div>
-        <p>Running simulation...</p>
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay" role="dialog" aria-labelledby="loading-title" aria-hidden="true">
+        <div class="loading-content">
+            <div class="spinner" aria-hidden="true"></div>
+            <h3 id="loading-title">Running Simulation</h3>
+            <p id="loading-message">Initializing Monte Carlo simulation...</p>
+            <div class="progress-info">
+                <small>This may take a few moments for large parameter values</small>
+            </div>
+        </div>
     </div>
 
+    <!-- Scripts -->
     <script src="markov.js"></script>
     <script src="app.js"></script>
+    
+    <!-- Error boundary and performance monitoring -->
+    <script>
+        // Global error handler for better debugging
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+            const errorMessage = `Unexpected error: ${event.error?.message || 'Unknown error'}`;
+            if (window.dashboard && window.dashboard._showError) {
+                window.dashboard._showError(errorMessage);
+            }
+        });
+        
+        // Performance monitoring
+        window.addEventListener('load', function() {
+            if ('performance' in window) {
+                const loadTime = performance.now();
+                console.log(`Page loaded in ${loadTime.toFixed(2)}ms`);
+            }
+        });
+    </script>
 </body>
 </html> 

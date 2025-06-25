@@ -1,122 +1,462 @@
 /**
- * Main Application Controller for Reversible Markov Process Dashboard
+ * Interactive Dashboard Controller for Reversible Markov Process Visualization
+ * 
+ * This application provides a comprehensive interface for exploring reversible
+ * two-dimensional Markov processes, allowing users to:
+ * - Adjust model parameters interactively
+ * - Run Monte Carlo simulations
+ * - Visualize theoretical vs empirical distributions
+ * - Analyze convergence quality and population dynamics
+ * 
+ * Architecture:
+ * - MarkovDashboard: Main controller class
+ * - ReversibleMarkovProcess: Mathematical engine (imported from markov.js)
+ * - Plotly.js: Visualization library for interactive plots
+ * - Responsive UI with parameter validation and error handling
  */
 
 class MarkovDashboard {
+    /**
+     * Initialize the dashboard with default state and event listeners
+     */
     constructor() {
+        // Core application state
         this.markovProcess = null;
         this.currentResults = null;
-        this.initializeEventListeners();
-        this.initializeDefaultPlots();
+        this.isSimulationRunning = false;
+        
+        // Performance tracking
+        this.lastUpdateTime = 0;
+        this.updateThrottleMs = 100; // Throttle parameter updates
+        
+        // Error state management
+        this.lastError = null;
+        this.errorDisplayTimeout = null;
+        
+        // Initialize application
+        this._initializeEventListeners();
+        this._initializeEmptyPlots();
+        this._validateBrowserCompatibility();
     }
 
-    initializeEventListeners() {
-        // Parameter input listeners
-        const paramInputs = document.querySelectorAll('.param-item input');
-        paramInputs.forEach(input => {
-            input.addEventListener('change', this.onParameterChange.bind(this));
-        });
+    /**
+     * Set up all event listeners for user interactions
+     * @private
+     */
+    _initializeEventListeners() {
+        try {
+            // Parameter input listeners with validation and throttling
+            const paramInputs = document.querySelectorAll('.param-item input');
+            paramInputs.forEach(input => {
+                // Real-time validation on input
+                input.addEventListener('input', this._onParameterInput.bind(this));
+                // Update model on change (with throttling)
+                input.addEventListener('change', this._onParameterChange.bind(this));
+                // Validate on blur
+                input.addEventListener('blur', this._validateSingleParameter.bind(this));
+            });
 
-        // Button listeners
-        document.getElementById('runSimulation').addEventListener('click', this.runSimulation.bind(this));
-        document.getElementById('resetParams').addEventListener('click', this.resetParameters.bind(this));
+            // Button event listeners with error handling
+            const runButton = document.getElementById('runSimulation');
+            const resetButton = document.getElementById('resetParams');
+            
+            if (runButton) {
+                runButton.addEventListener('click', this._handleRunSimulation.bind(this));
+            }
+            
+            if (resetButton) {
+                resetButton.addEventListener('click', this._handleResetParameters.bind(this));
+            }
 
-        // Tab switching
-        const tabButtons = document.querySelectorAll('.tab-button');
-        tabButtons.forEach(button => {
-            button.addEventListener('click', this.switchTab.bind(this));
-        });
+            // Tab switching with proper cleanup
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', this._handleTabSwitch.bind(this));
+            });
 
-        // Initialize with default parameters
-        this.updateMarkovProcess();
+            // Keyboard shortcuts
+            document.addEventListener('keydown', this._handleKeyboardShortcuts.bind(this));
+            
+            // Window resize handler for responsive plots
+            window.addEventListener('resize', this._handleWindowResize.bind(this));
+            
+            // Initialize with default parameters
+            this._updateMarkovProcess();
+            
+        } catch (error) {
+            this._handleError(error, 'Failed to initialize event listeners');
+        }
     }
 
-    initializeDefaultPlots() {
-        // Create empty plots with proper layout
-        const layout = {
+    /**
+     * Create empty plots with proper layout and loading states
+     * @private
+     */
+    _initializeEmptyPlots() {
+        const commonLayout = {
             margin: { l: 50, r: 50, t: 30, b: 50 },
             font: { size: 12 },
-            showlegend: false
+            showlegend: false,
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)'
         };
 
-        Plotly.newPlot('theoreticalHeatmap', [], { ...layout, title: 'Run simulation to see results' });
-        Plotly.newPlot('empiricalHeatmap', [], { ...layout, title: 'Run simulation to see results' });
-        Plotly.newPlot('comparisonPlot', [], { 
-            ...layout, 
-            title: 'Theory vs Simulation Comparison',
-            xaxis: { title: 'Theoretical Probability' },
-            yaxis: { title: 'Empirical Probability' }
-        });
-        Plotly.newPlot('trajectoryPlot', [], { 
-            ...layout, 
-            title: 'Sample Trajectory',
-            xaxis: { title: 'Red Population (x)' },
-            yaxis: { title: 'Blue Population (y)' }
-        });
-    }
-
-    onParameterChange() {
-        this.updateMarkovProcess();
-        this.updateTheoreticalPlot();
-    }
-
-    updateMarkovProcess() {
-        const params = this.getParametersFromForm();
-        this.markovProcess = new ReversibleMarkovProcess(params);
-    }
-
-    getParametersFromForm() {
-        return {
-            alpha1: parseFloat(document.getElementById('alpha1').value),
-            alpha2: parseFloat(document.getElementById('alpha2').value),
-            beta1: parseFloat(document.getElementById('beta1').value),
-            beta2: parseFloat(document.getElementById('beta2').value),
-            gamma: parseFloat(document.getElementById('gamma').value),
-            delta1: parseFloat(document.getElementById('delta1').value),
-            delta2: parseFloat(document.getElementById('delta2').value),
-            beta1_hat: parseFloat(document.getElementById('beta1_hat').value),
-            beta2_hat: parseFloat(document.getElementById('beta2_hat').value),
-            gamma_hat: parseFloat(document.getElementById('gamma_hat').value)
+        const plotConfig = { 
+            responsive: true, 
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d'],
+            displaylogo: false
         };
-    }
-
-    resetParameters() {
-        document.getElementById('alpha1').value = 1.5;
-        document.getElementById('alpha2').value = 1.2;
-        document.getElementById('beta1').value = 0.8;
-        document.getElementById('beta2').value = 0.8;
-        document.getElementById('gamma').value = 1.5;
-        document.getElementById('delta1').value = 0.9;
-        document.getElementById('delta2').value = 0.7;
-        document.getElementById('beta1_hat').value = 1.2;
-        document.getElementById('beta2_hat').value = 1.2;
-        document.getElementById('gamma_hat').value = 0.8;
-        
-        this.updateMarkovProcess();
-        this.updateTheoreticalPlot();
-    }
-
-    async runSimulation() {
-        const startTime = Date.now();
-        this.showLoading(true);
 
         try {
+            // Initialize heatmap plots
+            Plotly.newPlot('theoreticalHeatmap', [], { 
+                ...commonLayout, 
+                title: 'Theoretical Distribution<br><span style="font-size: 10px;">Run simulation to see results</span>' 
+            }, plotConfig);
+            
+            Plotly.newPlot('empiricalHeatmap', [], { 
+                ...commonLayout, 
+                title: 'Empirical Distribution<br><span style="font-size: 10px;">Run simulation to see results</span>' 
+            }, plotConfig);
+
+            // Initialize comparison plot
+            Plotly.newPlot('comparisonPlot', [], { 
+                ...commonLayout, 
+                title: 'Theory vs Simulation Comparison',
+                xaxis: { title: 'Theoretical Probability' },
+                yaxis: { title: 'Empirical Probability' }
+            }, plotConfig);
+
+            // Initialize trajectory plot
+            Plotly.newPlot('trajectoryPlot', [], { 
+                ...commonLayout, 
+                title: 'Sample Trajectory',
+                xaxis: { title: 'Red Population (x)' },
+                yaxis: { title: 'Blue Population (y)' }
+            }, plotConfig);
+            
+        } catch (error) {
+            this._handleError(error, 'Failed to initialize plots');
+        }
+    }
+
+    /**
+     * Check browser compatibility for required features
+     * @private
+     */
+    _validateBrowserCompatibility() {
+        const requiredFeatures = [
+            'Map', 'Set', 'Promise', 'fetch'
+        ];
+        
+        const missingFeatures = requiredFeatures.filter(feature => 
+            typeof window[feature] === 'undefined'
+        );
+        
+        if (missingFeatures.length > 0) {
+            this._showError(`Browser compatibility issue: Missing ${missingFeatures.join(', ')}. Please use a modern browser.`);
+        }
+    }
+
+    /**
+     * Handle parameter input with real-time validation
+     * @private
+     */
+    _onParameterInput(event) {
+        const input = event.target;
+        const value = parseFloat(input.value);
+        
+        // Real-time visual feedback
+        if (isNaN(value) || value <= 0) {
+            input.style.borderColor = '#ef4444';
+            input.style.backgroundColor = '#fef2f2';
+        } else {
+            input.style.borderColor = '#10b981';
+            input.style.backgroundColor = '#f0fdf4';
+        }
+    }
+
+    /**
+     * Handle parameter changes with throttling and validation
+     * @private
+     */
+    _onParameterChange(event) {
+        // Throttle updates to prevent excessive computation
+        const now = Date.now();
+        if (now - this.lastUpdateTime < this.updateThrottleMs) {
+            return;
+        }
+        this.lastUpdateTime = now;
+        
+        try {
+            if (this._validateAllParameters()) {
+                this._updateMarkovProcess();
+                this._updateTheoreticalPlot();
+            }
+        } catch (error) {
+            this._handleError(error, 'Parameter update failed');
+        }
+    }
+
+    /**
+     * Validate a single parameter input
+     * @private
+     */
+    _validateSingleParameter(event) {
+        const input = event.target;
+        const value = parseFloat(input.value);
+        const paramName = input.id;
+        
+        if (isNaN(value) || value <= 0 || !isFinite(value)) {
+            this._showParameterError(input, `${paramName} must be a positive number`);
+            return false;
+        }
+        
+        // Parameter-specific validation
+        const validationRules = {
+            alpha1: [0.1, 10],
+            alpha2: [0.1, 10],
+            beta1: [0.1, 5],
+            beta2: [0.1, 5],
+            gamma: [0.1, 10],
+            delta1: [0.1, 5],
+            delta2: [0.1, 5],
+            beta1_hat: [0.1, 10],
+            beta2_hat: [0.1, 10],
+            gamma_hat: [0.1, 5],
+            simTime: [10, 10000],
+            burnIn: [0, 1000],
+            maxStates: [5, 50]
+        };
+        
+        if (validationRules[paramName]) {
+            const [min, max] = validationRules[paramName];
+            if (value < min || value > max) {
+                this._showParameterError(input, `${paramName} should be between ${min} and ${max}`);
+                return false;
+            }
+        }
+        
+        this._clearParameterError(input);
+        return true;
+    }
+
+    /**
+     * Validate all parameters before updating model
+     * @private
+     */
+    _validateAllParameters() {
+        const inputs = document.querySelectorAll('.param-item input');
+        let allValid = true;
+        
+        inputs.forEach(input => {
+            if (!this._validateSingleParameter({ target: input })) {
+                allValid = false;
+            }
+        });
+        
+        return allValid;
+    }
+
+    /**
+     * Show parameter-specific error message
+     * @private
+     */
+    _showParameterError(input, message) {
+        input.style.borderColor = '#ef4444';
+        input.style.backgroundColor = '#fef2f2';
+        input.title = message;
+        
+        // Create or update error tooltip
+        let errorSpan = input.parentNode.querySelector('.param-error');
+        if (!errorSpan) {
+            errorSpan = document.createElement('span');
+            errorSpan.className = 'param-error';
+            input.parentNode.appendChild(errorSpan);
+        }
+        errorSpan.textContent = message;
+        errorSpan.style.color = '#ef4444';
+        errorSpan.style.fontSize = '11px';
+        errorSpan.style.display = 'block';
+    }
+
+    /**
+     * Clear parameter error styling
+     * @private
+     */
+    _clearParameterError(input) {
+        input.style.borderColor = '';
+        input.style.backgroundColor = '';
+        input.title = '';
+        
+        const errorSpan = input.parentNode.querySelector('.param-error');
+        if (errorSpan) {
+            errorSpan.remove();
+        }
+    }
+
+    /**
+     * Update the Markov process instance with current parameters
+     * @private
+     */
+    _updateMarkovProcess() {
+        try {
+            const params = this._getParametersFromForm();
+            this.markovProcess = new ReversibleMarkovProcess(params);
+            this._clearError();
+        } catch (error) {
+            this._handleError(error, 'Failed to create Markov process with current parameters');
+        }
+    }
+
+    /**
+     * Extract parameters from form inputs with validation
+     * @private
+     */
+    _getParametersFromForm() {
+        const params = {};
+        const inputs = document.querySelectorAll('.param-item input');
+        
+        inputs.forEach(input => {
+            const value = parseFloat(input.value);
+            if (isNaN(value) || value <= 0) {
+                throw new Error(`Invalid parameter ${input.id}: ${input.value}`);
+            }
+            
+            // Map HTML IDs to parameter names
+            const paramMap = {
+                'alpha1': 'alpha1',
+                'alpha2': 'alpha2',
+                'beta1': 'beta1',
+                'beta2': 'beta2',
+                'gamma': 'gamma',
+                'delta1': 'delta1',
+                'delta2': 'delta2',
+                'beta1_hat': 'beta1_hat',
+                'beta2_hat': 'beta2_hat',
+                'gamma_hat': 'gamma_hat'
+            };
+            
+            if (paramMap[input.id]) {
+                params[paramMap[input.id]] = value;
+            }
+        });
+        
+        return params;
+    }
+
+    /**
+     * Reset all parameters to safe default values
+     * @private
+     */
+    _handleResetParameters() {
+        try {
+            const defaultParams = {
+                alpha1: 1.5,
+                alpha2: 1.2,
+                beta1: 0.8,
+                beta2: 0.8,
+                gamma: 1.5,
+                delta1: 0.9,
+                delta2: 0.7,
+                beta1_hat: 1.2,
+                beta2_hat: 1.2,
+                gamma_hat: 0.8
+            };
+            
+            // Update form inputs
+            Object.entries(defaultParams).forEach(([key, value]) => {
+                const input = document.getElementById(key);
+                if (input) {
+                    input.value = value;
+                    this._clearParameterError(input);
+                }
+            });
+            
+            // Reset simulation parameters
+            document.getElementById('simTime').value = 200;
+            document.getElementById('burnIn').value = 50;
+            document.getElementById('maxStates').value = 12;
+            
+            this._updateMarkovProcess();
+            this._updateTheoreticalPlot();
+            
+            this._showSuccess('Parameters reset to defaults');
+            
+        } catch (error) {
+            this._handleError(error, 'Failed to reset parameters');
+        }
+    }
+
+    /**
+     * Handle simulation execution with comprehensive error handling
+     * @private
+     */
+    async _handleRunSimulation() {
+        if (this.isSimulationRunning) {
+            this._showWarning('Simulation already running. Please wait...');
+            return;
+        }
+        
+        try {
+            // Validate inputs first
+            if (!this._validateAllParameters()) {
+                this._showError('Please correct parameter errors before running simulation');
+                return;
+            }
+            
+            if (!this.markovProcess) {
+                throw new Error('Markov process not initialized');
+            }
+            
+            const startTime = performance.now();
+            this.isSimulationRunning = true;
+            this._showLoading(true);
+            this._updateSimulationButton(true);
+
             // Get simulation parameters
             const simTime = parseFloat(document.getElementById('simTime').value);
             const burnIn = parseFloat(document.getElementById('burnIn').value);
             const maxStates = parseInt(document.getElementById('maxStates').value);
 
-            // Run simulation
-            const results = this.markovProcess.simulate(simTime, burnIn, maxStates);
+            // Parameter sanity checks
+            if (simTime <= burnIn) {
+                throw new Error('Simulation time must be greater than burn-in time');
+            }
+            
+            if (maxStates < 5 || maxStates > 50) {
+                throw new Error('Maximum states should be between 5 and 50 for reasonable performance');
+            }
+
+            // Show progress indication
+            this._updateProgress('Starting simulation...');
+
+            // Run simulation with progress updates
+            const results = await this._runSimulationWithProgress(simTime, burnIn, maxStates);
+            
+            this._updateProgress('Calculating distributions...');
             
             // Calculate distributions
             const empiricalDist = this.markovProcess.getEmpiricalDistribution(results.samples, maxStates);
             const theoreticalDist = this.markovProcess.getTheoreticalDistribution(maxStates);
             
+            this._updateProgress('Computing statistics...');
+            
             // Calculate statistics
             const stats = this.markovProcess.calculateStatistics(results.samples);
             const tvDistance = this.markovProcess.totalVariationDistance(theoreticalDist, empiricalDist);
             
+            // Validate results
+            if (results.samples.length === 0) {
+                throw new Error('No samples collected during simulation');
+            }
+            
+            if (tvDistance > 0.8) {
+                console.warn('Very poor convergence detected (TV distance > 0.8). Consider adjusting parameters.');
+            }
+
+            // Store results
             this.currentResults = {
                 ...results,
                 empiricalDist,
@@ -124,242 +464,691 @@ class MarkovDashboard {
                 stats,
                 tvDistance,
                 maxStates,
-                simulationTime: (Date.now() - startTime) / 1000
+                simulationTime: (performance.now() - startTime) / 1000,
+                parameterSummary: this.markovProcess.getParameterSummary()
             };
 
+            this._updateProgress('Updating visualizations...');
+
             // Update all visualizations
-            this.updateAllPlots();
-            this.updateStatistics();
+            await this._updateAllPlots();
+            this._updateStatistics();
+            
+            // Show success message with key metrics
+            const message = `Simulation completed! TV distance: ${tvDistance.toFixed(4)}, Samples: ${results.samples.length.toLocaleString()}`;
+            this._showSuccess(message);
 
         } catch (error) {
-            console.error('Simulation error:', error);
-            alert('Error running simulation: ' + error.message);
+            this._handleError(error, 'Simulation failed');
         } finally {
-            this.showLoading(false);
+            this.isSimulationRunning = false;
+            this._showLoading(false);
+            this._updateSimulationButton(false);
         }
     }
 
-    updateTheoreticalPlot() {
-        if (!this.markovProcess) return;
-
-        const maxStates = parseInt(document.getElementById('maxStates').value) || 15;
-        const theoreticalDist = this.markovProcess.getTheoreticalDistribution(maxStates);
-        this.plotHeatmap('theoreticalHeatmap', theoreticalDist, maxStates, 'Theoretical Distribution');
+    /**
+     * Run simulation with periodic progress updates
+     * @private
+     */
+    async _runSimulationWithProgress(simTime, burnIn, maxStates) {
+        return new Promise((resolve, reject) => {
+            // Use setTimeout to allow UI updates
+            setTimeout(() => {
+                try {
+                    const results = this.markovProcess.simulate(simTime, burnIn, maxStates);
+                    resolve(results);
+                } catch (error) {
+                    reject(error);
+                }
+            }, 10);
+        });
     }
 
-    updateAllPlots() {
+    /**
+     * Update progress indicator
+     * @private
+     */
+    _updateProgress(message) {
+        const progressElement = document.querySelector('.loading-overlay p');
+        if (progressElement) {
+            progressElement.textContent = message;
+        }
+    }
+
+    /**
+     * Update theoretical distribution plot
+     * @private
+     */
+    _updateTheoreticalPlot() {
+        if (!this.markovProcess) return;
+
+        try {
+            const maxStates = parseInt(document.getElementById('maxStates').value) || 15;
+            const theoreticalDist = this.markovProcess.getTheoreticalDistribution(maxStates);
+            this._plotHeatmap('theoreticalHeatmap', theoreticalDist, maxStates, 'Theoretical Distribution');
+        } catch (error) {
+            console.warn('Failed to update theoretical plot:', error.message);
+        }
+    }
+
+    /**
+     * Update all plot visualizations
+     * @private
+     */
+    async _updateAllPlots() {
         if (!this.currentResults) return;
 
         const { empiricalDist, theoreticalDist, trajectory, maxStates } = this.currentResults;
 
-        // Update heatmaps
-        this.plotHeatmap('theoreticalHeatmap', theoreticalDist, maxStates, 'Theoretical Distribution');
-        this.plotHeatmap('empiricalHeatmap', empiricalDist, maxStates, 'Empirical Distribution');
-
-        // Update comparison plot
-        this.plotComparison(theoreticalDist, empiricalDist);
-
-        // Update trajectory plot
-        this.plotTrajectory(trajectory);
+        try {
+            // Update plots in parallel for better performance
+            await Promise.all([
+                this._plotHeatmap('theoreticalHeatmap', theoreticalDist, maxStates, 'Theoretical Distribution'),
+                this._plotHeatmap('empiricalHeatmap', empiricalDist, maxStates, 'Empirical Distribution'),
+                this._plotComparison(theoreticalDist, empiricalDist),
+                this._plotTrajectory(trajectory)
+            ]);
+        } catch (error) {
+            this._handleError(error, 'Failed to update plots');
+        }
     }
 
-    plotHeatmap(elementId, distribution, maxStates, title) {
-        // Convert distribution to matrix format for heatmap
-        const z = [];
-        const x = [];
-        const y = [];
+    /**
+     * Create heatmap visualization for probability distributions
+     * @private
+     */
+    async _plotHeatmap(elementId, distribution, maxStates, title) {
+        try {
+            // Convert distribution to matrix format for heatmap
+            const z = [];
+            const x = [];
+            const y = [];
 
-        for (let i = 0; i <= maxStates; i++) {
-            y.push(i);
-            x.push(i);
-        }
-
-        for (let j = maxStates; j >= 0; j--) {
-            const row = [];
             for (let i = 0; i <= maxStates; i++) {
-                const prob = distribution[`${i},${j}`] || 0;
-                row.push(prob);
+                y.push(i);
+                x.push(i);
             }
-            z.push(row);
-        }
 
-        const data = [{
-            z: z,
-            x: x,
-            y: y.reverse(),
-            type: 'heatmap',
-            colorscale: 'Viridis',
-            hoverongaps: false,
-            hovertemplate: 'x: %{x}<br>y: %{y}<br>Probability: %{z:.6f}<extra></extra>'
-        }];
+            // Build probability matrix (y-axis inverted for proper display)
+            for (let j = maxStates; j >= 0; j--) {
+                const row = [];
+                for (let i = 0; i <= maxStates; i++) {
+                    const prob = distribution[`${i},${j}`] || 0;
+                    row.push(prob);
+                }
+                z.push(row);
+            }
 
-        const layout = {
-            title: { text: title, font: { size: 14 } },
-            xaxis: { title: 'Red Population (x)', dtick: 1 },
-            yaxis: { title: 'Blue Population (y)', dtick: 1 },
-            margin: { l: 60, r: 60, t: 40, b: 60 },
-            height: 350
-        };
+            const data = [{
+                z: z,
+                x: x,
+                y: y.reverse(),
+                type: 'heatmap',
+                colorscale: 'Viridis',
+                hoverongaps: false,
+                hovertemplate: '<b>State (%{x}, %{y})</b><br>Probability: %{z:.6f}<extra></extra>',
+                colorbar: {
+                    title: 'Probability',
+                    titleside: 'right'
+                }
+            }];
 
-        Plotly.newPlot(elementId, data, layout, { responsive: true });
-    }
+            const layout = {
+                title: { 
+                    text: title, 
+                    font: { size: 14 },
+                    y: 0.95
+                },
+                xaxis: { 
+                    title: 'Red Population (x)', 
+                    dtick: 1,
+                    showgrid: true,
+                    gridcolor: 'rgba(255,255,255,0.3)'
+                },
+                yaxis: { 
+                    title: 'Blue Population (y)', 
+                    dtick: 1,
+                    showgrid: true,
+                    gridcolor: 'rgba(255,255,255,0.3)'
+                },
+                margin: { l: 60, r: 60, t: 40, b: 60 },
+                height: 350,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)'
+            };
 
-    plotComparison(theoretical, empirical) {
-        const theoreticalProbs = [];
-        const empiricalProbs = [];
-        const labels = [];
+            const config = { 
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
 
-        // Collect all states and their probabilities
-        const allKeys = new Set([...Object.keys(theoretical), ...Object.keys(empirical)]);
-        
-        for (let key of allKeys) {
-            const theoreticalProb = theoretical[key] || 0;
-            const empiricalProb = empirical[key] || 0;
+            await Plotly.newPlot(elementId, data, layout, config);
             
-            if (theoreticalProb > 1e-6 || empiricalProb > 1e-6) { // Only plot significant probabilities
-                theoreticalProbs.push(theoreticalProb);
-                empiricalProbs.push(empiricalProb);
-                labels.push(`(${key})`);
-            }
+        } catch (error) {
+            throw new Error(`Failed to plot heatmap ${elementId}: ${error.message}`);
         }
-
-        const data = [
-            {
-                x: theoreticalProbs,
-                y: empiricalProbs,
-                mode: 'markers',
-                type: 'scatter',
-                text: labels,
-                hovertemplate: '%{text}<br>Theoretical: %{x:.6f}<br>Empirical: %{y:.6f}<extra></extra>',
-                marker: {
-                    size: 8,
-                    color: 'rgba(37, 99, 235, 0.7)',
-                    line: { color: 'rgba(37, 99, 235, 1)', width: 1 }
-                },
-                name: 'States'
-            },
-            {
-                x: [0, Math.max(...theoreticalProbs)],
-                y: [0, Math.max(...theoreticalProbs)],
-                mode: 'lines',
-                type: 'scatter',
-                line: { color: 'red', dash: 'dash', width: 2 },
-                name: 'Perfect Agreement',
-                hoverinfo: 'none'
-            }
-        ];
-
-        const layout = {
-            title: 'Theory vs Simulation Comparison',
-            xaxis: { title: 'Theoretical Probability' },
-            yaxis: { title: 'Empirical Probability' },
-            margin: { l: 60, r: 60, t: 60, b: 60 },
-            height: 500,
-            showlegend: true
-        };
-
-        Plotly.newPlot('comparisonPlot', data, layout, { responsive: true });
     }
 
-    plotTrajectory(trajectory) {
-        // Sample trajectory points for better visualization
-        const sampleRate = Math.max(1, Math.floor(trajectory.length / 1000));
-        const sampledTrajectory = trajectory.filter((_, index) => index % sampleRate === 0);
+    /**
+     * Create scatter plot comparing theoretical vs empirical probabilities
+     * @private
+     */
+    async _plotComparison(theoretical, empirical) {
+        try {
+            const theoreticalProbs = [];
+            const empiricalProbs = [];
+            const labels = [];
+            const colors = [];
 
-        const data = [
-            {
-                x: sampledTrajectory.map(point => point.x),
-                y: sampledTrajectory.map(point => point.y),
-                mode: 'lines+markers',
-                type: 'scatter',
-                line: { color: 'rgba(16, 185, 129, 0.8)', width: 2 },
-                marker: { 
-                    size: 4, 
-                    color: sampledTrajectory.map((_, i) => i),
-                    colorscale: 'Plasma',
-                    showscale: true,
-                    colorbar: { title: 'Time Order' }
-                },
-                hovertemplate: 'x: %{x}<br>y: %{y}<br>Time: %{text}<extra></extra>',
-                text: sampledTrajectory.map(point => point.time.toFixed(2)),
-                name: 'Trajectory'
+            // Collect all states and their probabilities
+            const allKeys = new Set([...Object.keys(theoretical), ...Object.keys(empirical)]);
+            
+            for (let key of allKeys) {
+                const theoreticalProb = theoretical[key] || 0;
+                const empiricalProb = empirical[key] || 0;
+                
+                // Only plot states with significant probability mass
+                if (theoreticalProb > 1e-6 || empiricalProb > 1e-6) {
+                    theoreticalProbs.push(theoreticalProb);
+                    empiricalProbs.push(empiricalProb);
+                    labels.push(`(${key})`);
+                    
+                    // Color by agreement quality
+                    const error = Math.abs(theoreticalProb - empiricalProb);
+                    const maxProb = Math.max(theoreticalProb, empiricalProb);
+                    const relativeError = maxProb > 0 ? error / maxProb : 0;
+                    
+                    if (relativeError < 0.1) colors.push('rgba(16, 185, 129, 0.8)'); // Good agreement
+                    else if (relativeError < 0.3) colors.push('rgba(251, 191, 36, 0.8)'); // Fair agreement
+                    else colors.push('rgba(239, 68, 68, 0.8)'); // Poor agreement
+                }
             }
-        ];
 
-        const layout = {
-            title: 'Sample Trajectory',
-            xaxis: { title: 'Red Population (x)' },
-            yaxis: { title: 'Blue Population (y)' },
-            margin: { l: 60, r: 60, t: 60, b: 60 },
-            height: 500
-        };
+            const maxProb = Math.max(...theoreticalProbs);
 
-        Plotly.newPlot('trajectoryPlot', data, layout, { responsive: true });
+            const data = [
+                {
+                    x: theoreticalProbs,
+                    y: empiricalProbs,
+                    mode: 'markers',
+                    type: 'scatter',
+                    text: labels,
+                    hovertemplate: '<b>State %{text}</b><br>Theoretical: %{x:.6f}<br>Empirical: %{y:.6f}<br>Error: %{customdata:.6f}<extra></extra>',
+                    customdata: theoreticalProbs.map((t, i) => Math.abs(t - empiricalProbs[i])),
+                    marker: {
+                        size: 8,
+                        color: colors,
+                        line: { color: 'rgba(0, 0, 0, 0.3)', width: 1 }
+                    },
+                    name: 'State Probabilities'
+                },
+                {
+                    x: [0, maxProb],
+                    y: [0, maxProb],
+                    mode: 'lines',
+                    type: 'scatter',
+                    line: { color: 'red', dash: 'dash', width: 2 },
+                    name: 'Perfect Agreement',
+                    hoverinfo: 'none'
+                }
+            ];
+
+            const layout = {
+                title: 'Theory vs Simulation Comparison',
+                xaxis: { 
+                    title: 'Theoretical Probability',
+                    showgrid: true,
+                    gridcolor: 'rgba(128,128,128,0.3)'
+                },
+                yaxis: { 
+                    title: 'Empirical Probability',
+                    showgrid: true,
+                    gridcolor: 'rgba(128,128,128,0.3)'
+                },
+                margin: { l: 60, r: 60, t: 60, b: 60 },
+                height: 500,
+                showlegend: true,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                legend: {
+                    x: 0.02,
+                    y: 0.98,
+                    bgcolor: 'rgba(255,255,255,0.8)'
+                }
+            };
+
+            const config = { 
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            await Plotly.newPlot('comparisonPlot', data, layout, config);
+            
+        } catch (error) {
+            throw new Error(`Failed to plot comparison: ${error.message}`);
+        }
     }
 
-    updateStatistics() {
+    /**
+     * Create trajectory visualization showing population evolution over time
+     * @private
+     */
+    async _plotTrajectory(trajectory) {
+        try {
+            if (!trajectory || trajectory.length === 0) {
+                throw new Error('No trajectory data available');
+            }
+
+            // Sample trajectory points for better visualization performance
+            const maxPoints = 2000;
+            const sampleRate = Math.max(1, Math.floor(trajectory.length / maxPoints));
+            const sampledTrajectory = trajectory.filter((_, index) => index % sampleRate === 0);
+
+            const data = [
+                {
+                    x: sampledTrajectory.map(point => point.x),
+                    y: sampledTrajectory.map(point => point.y),
+                    mode: 'lines+markers',
+                    type: 'scatter',
+                    line: { 
+                        color: 'rgba(16, 185, 129, 0.6)', 
+                        width: 2
+                    },
+                    marker: { 
+                        size: 3, 
+                        color: sampledTrajectory.map((_, i) => i),
+                        colorscale: 'Plasma',
+                        showscale: true,
+                        colorbar: { 
+                            title: 'Time Order',
+                            titleside: 'right'
+                        },
+                        line: {
+                            color: 'rgba(255,255,255,0.6)',
+                            width: 0.5
+                        }
+                    },
+                    hovertemplate: '<b>State (%{x}, %{y})</b><br>Time: %{text}<br>Step: %{pointNumber}<extra></extra>',
+                    text: sampledTrajectory.map(point => point.time?.toFixed(2) || 'N/A'),
+                    name: 'Population Trajectory'
+                }
+            ];
+
+            // Add starting point marker
+            if (sampledTrajectory.length > 0) {
+                data.push({
+                    x: [sampledTrajectory[0].x],
+                    y: [sampledTrajectory[0].y],
+                    mode: 'markers',
+                    type: 'scatter',
+                    marker: {
+                        size: 12,
+                        color: 'red',
+                        symbol: 'star',
+                        line: { color: 'white', width: 2 }
+                    },
+                    name: 'Start',
+                    hovertemplate: '<b>Starting Point</b><br>State: (%{x}, %{y})<extra></extra>'
+                });
+            }
+
+            const layout = {
+                title: 'Sample Trajectory Through State Space',
+                xaxis: { 
+                    title: 'Red Population (x)',
+                    showgrid: true,
+                    gridcolor: 'rgba(128,128,128,0.3)'
+                },
+                yaxis: { 
+                    title: 'Blue Population (y)',
+                    showgrid: true,
+                    gridcolor: 'rgba(128,128,128,0.3)'
+                },
+                margin: { l: 60, r: 60, t: 60, b: 60 },
+                height: 500,
+                showlegend: true,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                legend: {
+                    x: 0.02,
+                    y: 0.98,
+                    bgcolor: 'rgba(255,255,255,0.8)'
+                }
+            };
+
+            const config = { 
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            await Plotly.newPlot('trajectoryPlot', data, layout, config);
+            
+        } catch (error) {
+            throw new Error(`Failed to plot trajectory: ${error.message}`);
+        }
+    }
+
+    /**
+     * Update statistics display with comprehensive metrics
+     * @private
+     */
+    _updateStatistics() {
         if (!this.currentResults) return;
 
-        const { stats, tvDistance, simulationTime, samples } = this.currentResults;
+        try {
+            const { stats, tvDistance, simulationTime, samples, parameterSummary } = this.currentResults;
 
-        // Quality assessment based on TV distance
-        let quality = 'Poor';
-        if (tvDistance < 0.1) quality = 'Excellent';
-        else if (tvDistance < 0.2) quality = 'Good';
-        else if (tvDistance < 0.3) quality = 'Fair';
+            // Quality assessment based on TV distance
+            let quality = 'Poor';
+            let qualityClass = 'poor';
+            
+            if (tvDistance < 0.1) {
+                quality = 'Excellent';
+                qualityClass = 'excellent';
+            } else if (tvDistance < 0.2) {
+                quality = 'Good';
+                qualityClass = 'good';
+            } else if (tvDistance < 0.3) {
+                quality = 'Fair';
+                qualityClass = 'fair';
+            }
 
-        document.getElementById('tvDistance').textContent = tvDistance.toFixed(6);
-        document.getElementById('convergenceQuality').textContent = quality;
-        document.getElementById('meanRed').textContent = stats.meanX.toFixed(3);
-        document.getElementById('meanBlue').textContent = stats.meanY.toFixed(3);
-        document.getElementById('sampleCount').textContent = samples.length.toLocaleString();
-        document.getElementById('simDuration').textContent = `${simulationTime.toFixed(2)}s`;
+            // Update display elements
+            this._updateStatElement('tvDistance', tvDistance.toFixed(6), qualityClass);
+            this._updateStatElement('convergenceQuality', quality, qualityClass);
+            this._updateStatElement('meanRed', stats.meanX.toFixed(3));
+            this._updateStatElement('meanBlue', stats.meanY.toFixed(3));
+            this._updateStatElement('sampleCount', samples.length.toLocaleString());
+            this._updateStatElement('simDuration', `${simulationTime.toFixed(2)}s`);
 
-        // Color-code the TV distance based on quality
-        const tvElement = document.getElementById('tvDistance');
-        tvElement.className = 'stat-value';
-        if (tvDistance < 0.1) tvElement.classList.add('excellent');
-        else if (tvDistance < 0.2) tvElement.classList.add('good');
-        else if (tvDistance < 0.3) tvElement.classList.add('fair');
-        else tvElement.classList.add('poor');
+            // Add additional statistics if available
+            if (stats.correlation !== undefined) {
+                this._updateOrCreateStatElement('correlation', 'Population Correlation:', stats.correlation.toFixed(3));
+            }
+            
+            if (parameterSummary) {
+                this._updateOrCreateStatElement('redBlueRatio', 'Red/Blue Balance:', 
+                    `${(parameterSummary.redRatio / parameterSummary.blueRatio).toFixed(2)}`);
+            }
+
+        } catch (error) {
+            console.warn('Failed to update statistics:', error.message);
+        }
     }
 
-    switchTab(event) {
+    /**
+     * Update a statistics element with optional styling
+     * @private
+     */
+    _updateStatElement(id, value, className = '') {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+            element.className = `stat-value ${className}`;
+        }
+    }
+
+    /**
+     * Update or create a statistics element
+     * @private
+     */
+    _updateOrCreateStatElement(id, label, value) {
+        let element = document.getElementById(id);
+        if (!element) {
+            const statsContainer = document.getElementById('statistics');
+            const statItem = document.createElement('div');
+            statItem.className = 'stat-item';
+            statItem.innerHTML = `
+                <span class="stat-label">${label}</span>
+                <span id="${id}" class="stat-value">${value}</span>
+            `;
+            statsContainer.appendChild(statItem);
+        } else {
+            element.textContent = value;
+        }
+    }
+
+    /**
+     * Handle tab switching with proper plot resizing
+     * @private
+     */
+    _handleTabSwitch(event) {
         const targetTab = event.target.dataset.tab;
         
-        // Update tab buttons
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        event.target.classList.add('active');
+        try {
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
 
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(targetTab).classList.add('active');
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(targetTab).classList.add('active');
 
-        // Resize plots when tab becomes visible
-        setTimeout(() => {
-            if (targetTab === 'comparison') {
-                Plotly.Plots.resize('comparisonPlot');
-            } else if (targetTab === 'trajectory') {
-                Plotly.Plots.resize('trajectoryPlot');
-            }
-        }, 100);
+            // Resize plots when tab becomes visible (with small delay for CSS transitions)
+            setTimeout(() => {
+                try {
+                    if (targetTab === 'comparison') {
+                        Plotly.Plots.resize('comparisonPlot');
+                    } else if (targetTab === 'trajectory') {
+                        Plotly.Plots.resize('trajectoryPlot');
+                    } else if (targetTab === 'heatmap') {
+                        Plotly.Plots.resize('theoreticalHeatmap');
+                        Plotly.Plots.resize('empiricalHeatmap');
+                    }
+                } catch (resizeError) {
+                    console.warn('Plot resize failed:', resizeError.message);
+                }
+            }, 150);
+            
+        } catch (error) {
+            this._handleError(error, 'Tab switching failed');
+        }
     }
 
-    showLoading(show) {
+    /**
+     * Handle keyboard shortcuts for improved usability
+     * @private
+     */
+    _handleKeyboardShortcuts(event) {
+        // Ctrl/Cmd + Enter: Run simulation
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            this._handleRunSimulation();
+        }
+        
+        // Ctrl/Cmd + R: Reset parameters
+        if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+            event.preventDefault();
+            this._handleResetParameters();
+        }
+        
+        // Tab numbers for quick switching
+        if (event.key >= '1' && event.key <= '3' && !event.target.matches('input')) {
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabIndex = parseInt(event.key) - 1;
+            if (tabButtons[tabIndex]) {
+                tabButtons[tabIndex].click();
+            }
+        }
+    }
+
+    /**
+     * Handle window resize for responsive plots
+     * @private
+     */
+    _handleWindowResize() {
+        // Debounce resize events
+        clearTimeout(this.resizeTimeout);
+        this.resizeTimeout = setTimeout(() => {
+            try {
+                Plotly.Plots.resize('theoreticalHeatmap');
+                Plotly.Plots.resize('empiricalHeatmap');
+                Plotly.Plots.resize('comparisonPlot');
+                Plotly.Plots.resize('trajectoryPlot');
+            } catch (error) {
+                console.warn('Window resize handling failed:', error.message);
+            }
+        }, 300);
+    }
+
+    /**
+     * Update simulation button state
+     * @private
+     */
+    _updateSimulationButton(isRunning) {
+        const button = document.getElementById('runSimulation');
+        if (button) {
+            button.disabled = isRunning;
+            button.textContent = isRunning ? 'Running Simulation...' : 'Run Simulation';
+            button.style.opacity = isRunning ? '0.6' : '1';
+        }
+    }
+
+    /**
+     * Show/hide loading overlay
+     * @private
+     */
+    _showLoading(show) {
         const loadingOverlay = document.getElementById('loading');
-        if (show) {
-            loadingOverlay.classList.add('active');
-        } else {
-            loadingOverlay.classList.remove('active');
+        if (loadingOverlay) {
+            if (show) {
+                loadingOverlay.classList.add('active');
+            } else {
+                loadingOverlay.classList.remove('active');
+            }
+        }
+    }
+
+    /**
+     * Centralized error handling with user-friendly messages
+     * @private
+     */
+    _handleError(error, context = '') {
+        console.error(`${context}:`, error);
+        
+        this.lastError = { error, context, timestamp: Date.now() };
+        
+        let userMessage = error.message || 'An unexpected error occurred';
+        if (context) {
+            userMessage = `${context}: ${userMessage}`;
+        }
+        
+        this._showError(userMessage);
+    }
+
+    /**
+     * Display error message to user
+     * @private
+     */
+    _showError(message) {
+        this._showMessage(message, 'error');
+    }
+
+    /**
+     * Display warning message to user
+     * @private
+     */
+    _showWarning(message) {
+        this._showMessage(message, 'warning');
+    }
+
+    /**
+     * Display success message to user
+     * @private
+     */
+    _showSuccess(message) {
+        this._showMessage(message, 'success');
+    }
+
+    /**
+     * Display a temporary message to the user
+     * @private
+     */
+    _showMessage(message, type = 'info') {
+        // Clear any existing message timeout
+        if (this.errorDisplayTimeout) {
+            clearTimeout(this.errorDisplayTimeout);
+        }
+        
+        // Create or update message element
+        let messageElement = document.getElementById('system-message');
+        if (!messageElement) {
+            messageElement = document.createElement('div');
+            messageElement.id = 'system-message';
+            messageElement.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                border-radius: 6px;
+                color: white;
+                font-weight: 500;
+                z-index: 10000;
+                max-width: 400px;
+                word-wrap: break-word;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                transition: opacity 0.3s ease;
+            `;
+            document.body.appendChild(messageElement);
+        }
+        
+        // Set message type styling
+        const typeStyles = {
+            error: 'background-color: #ef4444;',
+            warning: 'background-color: #f59e0b;',
+            success: 'background-color: #10b981;',
+            info: 'background-color: #3b82f6;'
+        };
+        
+        messageElement.style.cssText += typeStyles[type] || typeStyles.info;
+        messageElement.textContent = message;
+        messageElement.style.opacity = '1';
+        
+        // Auto-hide after delay
+        this.errorDisplayTimeout = setTimeout(() => {
+            if (messageElement) {
+                messageElement.style.opacity = '0';
+                setTimeout(() => {
+                    if (messageElement.parentNode) {
+                        messageElement.parentNode.removeChild(messageElement);
+                    }
+                }, 300);
+            }
+        }, type === 'error' ? 8000 : 4000);
+    }
+
+    /**
+     * Clear any displayed error messages
+     * @private
+     */
+    _clearError() {
+        const messageElement = document.getElementById('system-message');
+        if (messageElement) {
+            messageElement.style.opacity = '0';
+            setTimeout(() => {
+                if (messageElement.parentNode) {
+                    messageElement.parentNode.removeChild(messageElement);
+                }
+            }, 300);
         }
     }
 }
 
 // Initialize the dashboard when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    window.dashboard = new MarkovDashboard();
+    try {
+        window.dashboard = new MarkovDashboard();
+        console.log('Markov Dashboard initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize dashboard:', error);
+        alert('Failed to load the application. Please refresh the page and try again.');
+    }
 }); 
