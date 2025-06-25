@@ -51,23 +51,23 @@
                         <h3>Arrival Parameters</h3>
                         <div class="param-item">
                             <label for="alpha1">α₁:</label>
-                            <input type="number" id="alpha1" value="2.0" step="0.1" min="0.1">
+                            <input type="number" id="alpha1" value="1.5" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="alpha2">α₂:</label>
-                            <input type="number" id="alpha2" value="1.5" step="0.1" min="0.1">
+                            <input type="number" id="alpha2" value="1.2" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="beta1">β₁:</label>
-                            <input type="number" id="beta1" value="1.0" step="0.1" min="0.1">
+                            <input type="number" id="beta1" value="0.8" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="beta2">β₂:</label>
-                            <input type="number" id="beta2" value="1.0" step="0.1" min="0.1">
+                            <input type="number" id="beta2" value="0.8" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="gamma">γ:</label>
-                            <input type="number" id="gamma" value="2.0" step="0.1" min="0.1">
+                            <input type="number" id="gamma" value="1.5" step="0.1" min="0.1">
                         </div>
                     </div>
 
@@ -75,23 +75,23 @@
                         <h3>Departure Parameters</h3>
                         <div class="param-item">
                             <label for="delta1">δ₁:</label>
-                            <input type="number" id="delta1" value="1.0" step="0.1" min="0.1">
+                            <input type="number" id="delta1" value="0.9" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="delta2">δ₂:</label>
-                            <input type="number" id="delta2" value="0.8" step="0.1" min="0.1">
+                            <input type="number" id="delta2" value="0.7" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="beta1_hat">β̂₁:</label>
-                            <input type="number" id="beta1_hat" value="2.0" step="0.1" min="0.1">
+                            <input type="number" id="beta1_hat" value="1.2" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="beta2_hat">β̂₂:</label>
-                            <input type="number" id="beta2_hat" value="2.0" step="0.1" min="0.1">
+                            <input type="number" id="beta2_hat" value="1.2" step="0.1" min="0.1">
                         </div>
                         <div class="param-item">
                             <label for="gamma_hat">γ̂:</label>
-                            <input type="number" id="gamma_hat" value="1.0" step="0.1" min="0.1">
+                            <input type="number" id="gamma_hat" value="0.8" step="0.1" min="0.1">
                         </div>
                     </div>
                 </div>
@@ -100,18 +100,28 @@
                     <h3>Simulation Settings</h3>
                     <div class="param-item">
                         <label for="simTime">Simulation Time:</label>
-                        <input type="number" id="simTime" value="100" step="10" min="10">
+                        <input type="number" id="simTime" value="200" step="10" min="10">
                     </div>
                     <div class="param-item">
                         <label for="burnIn">Burn-in Time:</label>
-                        <input type="number" id="burnIn" value="20" step="5" min="0">
+                        <input type="number" id="burnIn" value="50" step="5" min="0">
                     </div>
                     <div class="param-item">
                         <label for="maxStates">Max State (x,y):</label>
-                        <input type="number" id="maxStates" value="15" step="1" min="5">
+                        <input type="number" id="maxStates" value="12" step="1" min="5">
                     </div>
                     <button id="runSimulation" class="btn-primary">Run Simulation</button>
                     <button id="resetParams" class="btn-secondary">Reset Parameters</button>
+                    
+                    <div class="parameter-tips">
+                        <h4>💡 Tips for Good Convergence</h4>
+                        <ul>
+                            <li><strong>Balance:</strong> Keep α₁/δ₁ ≈ α₂/δ₂ for symmetric populations</li>
+                            <li><strong>Stability:</strong> Ensure departure rates can handle arrivals</li>
+                            <li><strong>Time:</strong> Use longer simulation time for better convergence</li>
+                            <li><strong>Burn-in:</strong> Allow sufficient time to reach stationarity</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -155,8 +165,8 @@
                         <span id="tvDistance" class="stat-value">-</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-label">Kolmogorov-Smirnov Test:</span>
-                        <span id="ksTest" class="stat-value">-</span>
+                        <span class="stat-label">Convergence Quality:</span>
+                        <span id="convergenceQuality" class="stat-value">-</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Mean Red Population:</span>
@@ -165,6 +175,10 @@
                     <div class="stat-item">
                         <span class="stat-label">Mean Blue Population:</span>
                         <span id="meanBlue" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Sample Count:</span>
+                        <span id="sampleCount" class="stat-value">-</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Simulation Time:</span>

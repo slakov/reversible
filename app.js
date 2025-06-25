@@ -81,16 +81,16 @@ class MarkovDashboard {
     }
 
     resetParameters() {
-        document.getElementById('alpha1').value = 2.0;
-        document.getElementById('alpha2').value = 1.5;
-        document.getElementById('beta1').value = 1.0;
-        document.getElementById('beta2').value = 1.0;
-        document.getElementById('gamma').value = 2.0;
-        document.getElementById('delta1').value = 1.0;
-        document.getElementById('delta2').value = 0.8;
-        document.getElementById('beta1_hat').value = 2.0;
-        document.getElementById('beta2_hat').value = 2.0;
-        document.getElementById('gamma_hat').value = 1.0;
+        document.getElementById('alpha1').value = 1.5;
+        document.getElementById('alpha2').value = 1.2;
+        document.getElementById('beta1').value = 0.8;
+        document.getElementById('beta2').value = 0.8;
+        document.getElementById('gamma').value = 1.5;
+        document.getElementById('delta1').value = 0.9;
+        document.getElementById('delta2').value = 0.7;
+        document.getElementById('beta1_hat').value = 1.2;
+        document.getElementById('beta2_hat').value = 1.2;
+        document.getElementById('gamma_hat').value = 0.8;
         
         this.updateMarkovProcess();
         this.updateTheoreticalPlot();
@@ -300,13 +300,28 @@ class MarkovDashboard {
     updateStatistics() {
         if (!this.currentResults) return;
 
-        const { stats, tvDistance, simulationTime } = this.currentResults;
+        const { stats, tvDistance, simulationTime, samples } = this.currentResults;
+
+        // Quality assessment based on TV distance
+        let quality = 'Poor';
+        if (tvDistance < 0.1) quality = 'Excellent';
+        else if (tvDistance < 0.2) quality = 'Good';
+        else if (tvDistance < 0.3) quality = 'Fair';
 
         document.getElementById('tvDistance').textContent = tvDistance.toFixed(6);
-        document.getElementById('ksTest').textContent = 'N/A'; // Could implement KS test
+        document.getElementById('convergenceQuality').textContent = quality;
         document.getElementById('meanRed').textContent = stats.meanX.toFixed(3);
         document.getElementById('meanBlue').textContent = stats.meanY.toFixed(3);
+        document.getElementById('sampleCount').textContent = samples.length.toLocaleString();
         document.getElementById('simDuration').textContent = `${simulationTime.toFixed(2)}s`;
+
+        // Color-code the TV distance based on quality
+        const tvElement = document.getElementById('tvDistance');
+        tvElement.className = 'stat-value';
+        if (tvDistance < 0.1) tvElement.classList.add('excellent');
+        else if (tvDistance < 0.2) tvElement.classList.add('good');
+        else if (tvDistance < 0.3) tvElement.classList.add('fair');
+        else tvElement.classList.add('poor');
     }
 
     switchTab(event) {

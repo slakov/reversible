@@ -6,16 +6,16 @@
 class ReversibleMarkovProcess {
     constructor(params) {
         this.params = {
-            alpha1: params.alpha1 || 2.0,
-            alpha2: params.alpha2 || 1.5,
-            beta1: params.beta1 || 1.0,
-            beta2: params.beta2 || 1.0,
-            gamma: params.gamma || 2.0,
-            delta1: params.delta1 || 1.0,
-            delta2: params.delta2 || 0.8,
-            beta1_hat: params.beta1_hat || 2.0,
-            beta2_hat: params.beta2_hat || 2.0,
-            gamma_hat: params.gamma_hat || 1.0
+            alpha1: params.alpha1 || 1.5,
+            alpha2: params.alpha2 || 1.2,
+            beta1: params.beta1 || 0.8,
+            beta2: params.beta2 || 0.8,
+            gamma: params.gamma || 1.5,
+            delta1: params.delta1 || 0.9,
+            delta2: params.delta2 || 0.7,
+            beta1_hat: params.beta1_hat || 1.2,
+            beta2_hat: params.beta2_hat || 1.2,
+            gamma_hat: params.gamma_hat || 0.8
         };
     }
 
@@ -136,10 +136,13 @@ class ReversibleMarkovProcess {
      * Simulate the Markov process using Gillespie's algorithm
      */
     simulate(totalTime, burnInTime = 0, maxStates = 20) {
-        let x = 1, y = 1; // Starting state
+        let x = Math.floor(Math.random() * 3) + 1; // Random starting state 1-3
+        let y = Math.floor(Math.random() * 3) + 1;
         let currentTime = 0;
         const trajectory = [];
         const samples = [];
+        let lastSampleTime = 0;
+        const sampleInterval = 0.1; // Sample every 0.1 time units for better statistics
         
         while (currentTime < totalTime + burnInTime) {
             // Calculate transition rates
@@ -149,16 +152,20 @@ class ReversibleMarkovProcess {
             const rate4 = this.mu2(x, y);     // Blue departure
             const totalRate = rate1 + rate2 + rate3 + rate4;
             
-            if (totalRate <= 0) {
-                break; // No more transitions possible
+            if (totalRate <= 1e-10) {
+                // If rates are too small, advance time manually
+                currentTime += 1.0;
+                continue;
             }
             
             // Sample waiting time
             const waitTime = -Math.log(Math.random()) / totalRate;
             currentTime += waitTime;
             
-            // Record trajectory point
-            trajectory.push({ time: currentTime, x: x, y: y });
+            // Record trajectory point (subsample for performance)
+            if (trajectory.length < 10000) {
+                trajectory.push({ time: currentTime, x: x, y: y });
+            }
             
             // Sample which transition occurs
             const rand = Math.random() * totalRate;
@@ -177,15 +184,22 @@ class ReversibleMarkovProcess {
                 y = Math.max(0, y - 1);
             }
             
-            // Bounds checking
-            if (x > maxStates || y > maxStates) {
-                x = Math.min(x, maxStates);
-                y = Math.min(y, maxStates);
+            // Bounds checking with reflection to keep process ergodic
+            if (x > maxStates) {
+                x = maxStates;
+                // Force a departure event
+                if (Math.random() < 0.5) x = Math.max(0, x - 1);
+            }
+            if (y > maxStates) {
+                y = maxStates;
+                // Force a departure event
+                if (Math.random() < 0.5) y = Math.max(0, y - 1);
             }
             
-            // Collect samples after burn-in period
-            if (currentTime >= burnInTime) {
+            // Collect samples after burn-in period with regular intervals
+            if (currentTime >= burnInTime && currentTime >= lastSampleTime + sampleInterval) {
                 samples.push({ x: x, y: y });
+                lastSampleTime = currentTime;
             }
         }
         
