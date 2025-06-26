@@ -33,6 +33,11 @@ class MarkovDashboard {
         this.lastError = null;
         this.errorDisplayTimeout = null;
         
+        // Animation state
+        this.animationEngine = null;
+        this.isAnimationRunning = false;
+        this.animationSpeed = 1.0;
+        
         // Initialize application
         this._initializeEventListeners();
         this._initializeEmptyPlots();
@@ -79,6 +84,9 @@ class MarkovDashboard {
             
             // Window resize handler for responsive plots
             window.addEventListener('resize', this._handleWindowResize.bind(this));
+            
+            // Animation controls
+            this._initializeAnimationControls();
             
             // Initialize with default parameters
             this._updateMarkovProcess();
@@ -1139,6 +1147,506 @@ class MarkovDashboard {
                 }
             }, 300);
         }
+    }
+
+    /**
+     * Initialize animation controls and canvas
+     * @private
+     */
+    _initializeAnimationControls() {
+        try {
+            // Animation control buttons
+            const playPauseBtn = document.getElementById('playPause');
+            const resetBtn = document.getElementById('resetAnimation');
+            const speedSlider = document.getElementById('animationSpeed');
+            const speedValue = document.getElementById('speedValue');
+
+            if (playPauseBtn) {
+                playPauseBtn.addEventListener('click', this._toggleAnimation.bind(this));
+            }
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', this._resetAnimation.bind(this));
+            }
+
+            if (speedSlider && speedValue) {
+                speedSlider.addEventListener('input', (e) => {
+                    this.animationSpeed = parseFloat(e.target.value);
+                    speedValue.textContent = `${this.animationSpeed.toFixed(1)}x`;
+                    if (this.animationEngine) {
+                        this.animationEngine.setSpeed(this.animationSpeed);
+                    }
+                });
+            }
+
+            // Initialize animation engine when tab becomes active
+            document.addEventListener('click', (e) => {
+                if (e.target.matches('[data-tab="animation"]')) {
+                    setTimeout(() => this._initializeAnimationEngine(), 100);
+                }
+            });
+
+        } catch (error) {
+            console.warn('Failed to initialize animation controls:', error.message);
+        }
+    }
+
+    /**
+     * Initialize the animation engine with canvas
+     * @private
+     */
+    _initializeAnimationEngine() {
+        try {
+            const canvas = document.getElementById('populationCanvas');
+            if (!canvas || this.animationEngine) return;
+
+            this.animationEngine = new PopulationAnimationEngine(canvas);
+            console.log('Animation engine initialized');
+        } catch (error) {
+            this._handleError(error, 'Failed to initialize animation engine');
+        }
+    }
+
+    /**
+     * Toggle animation play/pause
+     * @private
+     */
+    _toggleAnimation() {
+        try {
+            if (!this.animationEngine) {
+                this._initializeAnimationEngine();
+                if (!this.animationEngine) {
+                    throw new Error('Animation engine not available');
+                }
+            }
+
+            if (!this.markovProcess) {
+                throw new Error('Please set parameters first');
+            }
+
+            const playPauseBtn = document.getElementById('playPause');
+
+            if (this.isAnimationRunning) {
+                this.animationEngine.pause();
+                this.isAnimationRunning = false;
+                if (playPauseBtn) playPauseBtn.textContent = '▶️ Play';
+            } else {
+                // Start new simulation for animation
+                this.animationEngine.start(this.markovProcess);
+                this.isAnimationRunning = true;
+                if (playPauseBtn) playPauseBtn.textContent = '⏸️ Pause';
+            }
+        } catch (error) {
+            this._handleError(error, 'Animation control failed');
+        }
+    }
+
+    /**
+     * Reset animation to initial state
+     * @private
+     */
+    _resetAnimation() {
+        try {
+            if (this.animationEngine) {
+                this.animationEngine.reset();
+            }
+            
+            this.isAnimationRunning = false;
+            const playPauseBtn = document.getElementById('playPause');
+            if (playPauseBtn) playPauseBtn.textContent = '▶️ Play';
+
+            // Reset display elements
+            document.getElementById('redCount').textContent = '0';
+            document.getElementById('blueCount').textContent = '0';
+            document.getElementById('animationTime').textContent = '0.00';
+            
+            const eventLog = document.getElementById('eventLog');
+            if (eventLog) {
+                eventLog.innerHTML = '<div class="event-item">Ready to start simulation...</div>';
+            }
+
+        } catch (error) {
+            this._handleError(error, 'Animation reset failed');
+        }
+    }
+}
+
+/**
+ * Population Animation Engine
+ * Handles real-time visualization of population dynamics
+ */
+class PopulationAnimationEngine {
+    constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.width = canvas.width;
+        this.height = canvas.height;
+        
+        // Animation state
+        this.isRunning = false;
+        this.currentTime = 0;
+        this.speed = 1.0;
+        this.lastFrameTime = 0;
+        
+        // Population state
+        this.redPopulation = [];
+        this.bluePopulation = [];
+        this.particles = []; // For animation effects
+        
+        // Visual settings
+        this.dotRadius = 6;
+        this.spacing = 20;
+        this.margin = 40;
+        
+        // Event tracking
+        this.eventLog = [];
+        this.maxLogEntries = 10;
+        
+        this._setupCanvas();
+        this._initializeDisplay();
+    }
+
+    _setupCanvas() {
+        // Set up canvas for high DPI displays
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.canvas.getBoundingClientRect();
+        
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        
+        this.ctx.scale(dpr, dpr);
+        this.width = rect.width;
+        this.height = rect.height;
+    }
+
+    _initializeDisplay() {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        
+        // Draw initial background
+        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Draw grid
+        this._drawGrid();
+        
+        // Draw initial message
+        this.ctx.fillStyle = '#64748b';
+        this.ctx.font = '16px Inter, sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Click Play to start population simulation', this.width / 2, this.height / 2);
+    }
+
+    _drawGrid() {
+        this.ctx.strokeStyle = '#e2e8f0';
+        this.ctx.lineWidth = 1;
+        
+        // Vertical lines
+        for (let x = this.margin; x < this.width - this.margin; x += this.spacing * 2) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, this.margin);
+            this.ctx.lineTo(x, this.height - this.margin);
+            this.ctx.stroke();
+        }
+        
+        // Horizontal lines
+        for (let y = this.margin; y < this.height - this.margin; y += this.spacing * 2) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.margin, y);
+            this.ctx.lineTo(this.width - this.margin, y);
+            this.ctx.stroke();
+        }
+    }
+
+    start(markovProcess) {
+        this.markovProcess = markovProcess;
+        this.reset();
+        this.isRunning = true;
+        this.lastFrameTime = performance.now();
+        this._animate();
+        this._runSimulation();
+    }
+
+    pause() {
+        this.isRunning = false;
+    }
+
+    reset() {
+        this.currentTime = 0;
+        this.redPopulation = [];
+        this.bluePopulation = [];
+        this.particles = [];
+        this.eventLog = [];
+        this._updateCounters();
+        this._updateEventLog();
+        this._initializeDisplay();
+    }
+
+    setSpeed(speed) {
+        this.speed = speed;
+    }
+
+    _animate() {
+        if (!this.isRunning) return;
+
+        const currentFrameTime = performance.now();
+        const deltaTime = (currentFrameTime - this.lastFrameTime) * this.speed;
+        this.lastFrameTime = currentFrameTime;
+
+        // Update particles
+        this._updateParticles(deltaTime);
+        
+        // Draw frame
+        this._drawFrame();
+        
+        requestAnimationFrame(() => this._animate());
+    }
+
+    _runSimulation() {
+        if (!this.isRunning || !this.markovProcess) return;
+
+        try {
+            // Calculate current rates
+            const x = this.redPopulation.length;
+            const y = this.bluePopulation.length;
+            
+            const lambda1 = this.markovProcess.lambda1(x, y); // Red arrival
+            const lambda2 = this.markovProcess.lambda2(x, y); // Blue arrival
+            const mu1 = this.markovProcess.mu1(x, y);         // Red departure
+            const mu2 = this.markovProcess.mu2(x, y);         // Blue departure
+            const totalRate = lambda1 + lambda2 + mu1 + mu2;
+
+            if (totalRate <= 1e-10) {
+                // Very low rates, wait a bit
+                setTimeout(() => this._runSimulation(), 100 / this.speed);
+                return;
+            }
+
+            // Sample waiting time
+            const waitTime = (-Math.log(Math.random()) / totalRate) * 1000; // Convert to ms
+            
+            setTimeout(() => {
+                if (!this.isRunning) return;
+
+                // Sample which event occurs
+                const rand = Math.random() * totalRate;
+                
+                if (rand < lambda1) {
+                    this._addRedIndividual();
+                } else if (rand < lambda1 + lambda2) {
+                    this._addBlueIndividual();
+                } else if (rand < lambda1 + lambda2 + mu1) {
+                    this._removeRedIndividual();
+                } else {
+                    this._removeBlueIndividual();
+                }
+
+                this.currentTime += waitTime / 1000;
+                this._updateTime();
+                this._runSimulation(); // Continue simulation
+                
+            }, Math.max(10, waitTime / this.speed)); // Minimum 10ms delay for visualization
+
+        } catch (error) {
+            console.error('Simulation step failed:', error);
+            this.pause();
+        }
+    }
+
+    _addRedIndividual() {
+        const position = this._getRandomPosition('red');
+        const individual = {
+            id: Date.now() + Math.random(),
+            x: position.x,
+            y: position.y,
+            targetX: position.x,
+            targetY: position.y,
+            isNew: true
+        };
+        
+        this.redPopulation.push(individual);
+        this._addParticleEffect(position.x, position.y, '#ef4444', 'arrival');
+        this._logEvent('Red arrival', 'arrival');
+        this._updateCounters();
+    }
+
+    _addBlueIndividual() {
+        const position = this._getRandomPosition('blue');
+        const individual = {
+            id: Date.now() + Math.random(),
+            x: position.x,
+            y: position.y,
+            targetX: position.x,
+            targetY: position.y,
+            isNew: true
+        };
+        
+        this.bluePopulation.push(individual);
+        this._addParticleEffect(position.x, position.y, '#3b82f6', 'arrival');
+        this._logEvent('Blue arrival', 'arrival');
+        this._updateCounters();
+    }
+
+    _removeRedIndividual() {
+        if (this.redPopulation.length === 0) return;
+        
+        const index = Math.floor(Math.random() * this.redPopulation.length);
+        const individual = this.redPopulation[index];
+        
+        this._addParticleEffect(individual.x, individual.y, '#ef4444', 'departure');
+        this.redPopulation.splice(index, 1);
+        this._logEvent('Red departure', 'departure');
+        this._updateCounters();
+    }
+
+    _removeBlueIndividual() {
+        if (this.bluePopulation.length === 0) return;
+        
+        const index = Math.floor(Math.random() * this.bluePopulation.length);
+        const individual = this.bluePopulation[index];
+        
+        this._addParticleEffect(individual.x, individual.y, '#3b82f6', 'departure');
+        this.bluePopulation.splice(index, 1);
+        this._logEvent('Blue departure', 'departure');
+        this._updateCounters();
+    }
+
+    _getRandomPosition(type) {
+        const totalCount = this.redPopulation.length + this.bluePopulation.length;
+        const gridCols = Math.floor((this.width - 2 * this.margin) / this.spacing);
+        const gridRows = Math.floor((this.height - 2 * this.margin) / this.spacing);
+        
+        // Try to find empty position
+        let attempts = 0;
+        while (attempts < 50) {
+            const col = Math.floor(Math.random() * gridCols);
+            const row = Math.floor(Math.random() * gridRows);
+            const x = this.margin + col * this.spacing + this.spacing / 2;
+            const y = this.margin + row * this.spacing + this.spacing / 2;
+            
+            // Check if position is free
+            const occupied = [...this.redPopulation, ...this.bluePopulation].some(ind => 
+                Math.abs(ind.x - x) < this.spacing * 0.7 && Math.abs(ind.y - y) < this.spacing * 0.7
+            );
+            
+            if (!occupied) {
+                return { x, y };
+            }
+            attempts++;
+        }
+        
+        // Fallback: random position with slight offset
+        return {
+            x: this.margin + Math.random() * (this.width - 2 * this.margin),
+            y: this.margin + Math.random() * (this.height - 2 * this.margin)
+        };
+    }
+
+    _addParticleEffect(x, y, color, type) {
+        this.particles.push({
+            x: x,
+            y: y,
+            color: color,
+            type: type,
+            life: 1.0,
+            scale: type === 'arrival' ? 0.1 : 1.0
+        });
+    }
+
+    _updateParticles(deltaTime) {
+        this.particles.forEach(particle => {
+            particle.life -= deltaTime * 0.003; // Fade over ~300ms
+            
+            if (particle.type === 'arrival') {
+                particle.scale = Math.min(1.0, particle.scale + deltaTime * 0.01);
+            } else {
+                particle.scale = Math.max(0.1, particle.scale - deltaTime * 0.008);
+            }
+        });
+        
+        // Remove dead particles
+        this.particles = this.particles.filter(particle => particle.life > 0);
+    }
+
+    _drawFrame() {
+        this.ctx.clearRect(0, 0, this.width, this.height);
+        
+        // Draw background
+        this.ctx.fillStyle = '#f8fafc';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Draw grid
+        this._drawGrid();
+        
+        // Draw populations
+        this._drawPopulation(this.redPopulation, '#ef4444');
+        this._drawPopulation(this.bluePopulation, '#3b82f6');
+        
+        // Draw particle effects
+        this._drawParticles();
+    }
+
+    _drawPopulation(population, color) {
+        population.forEach(individual => {
+            this.ctx.fillStyle = color;
+            this.ctx.beginPath();
+            this.ctx.arc(individual.x, individual.y, this.dotRadius, 0, 2 * Math.PI);
+            this.ctx.fill();
+            
+            // Add glow effect
+            this.ctx.shadowColor = color;
+            this.ctx.shadowBlur = 8;
+            this.ctx.fill();
+            this.ctx.shadowBlur = 0;
+        });
+    }
+
+    _drawParticles() {
+        this.particles.forEach(particle => {
+            this.ctx.save();
+            this.ctx.globalAlpha = particle.life;
+            this.ctx.fillStyle = particle.color;
+            
+            const radius = this.dotRadius * particle.scale * 1.5;
+            this.ctx.beginPath();
+            this.ctx.arc(particle.x, particle.y, radius, 0, 2 * Math.PI);
+            this.ctx.fill();
+            
+            this.ctx.restore();
+        });
+    }
+
+    _updateCounters() {
+        document.getElementById('redCount').textContent = this.redPopulation.length;
+        document.getElementById('blueCount').textContent = this.bluePopulation.length;
+    }
+
+    _updateTime() {
+        document.getElementById('animationTime').textContent = this.currentTime.toFixed(2);
+    }
+
+    _logEvent(event, type) {
+        this.eventLog.unshift({
+            event: event,
+            type: type,
+            time: this.currentTime.toFixed(2)
+        });
+        
+        if (this.eventLog.length > this.maxLogEntries) {
+            this.eventLog.pop();
+        }
+        
+        this._updateEventLog();
+    }
+
+    _updateEventLog() {
+        const eventLogEl = document.getElementById('eventLog');
+        if (!eventLogEl) return;
+        
+        eventLogEl.innerHTML = this.eventLog.map(entry => 
+            `<div class="event-item ${entry.type}">t=${entry.time}s: ${entry.event}</div>`
+        ).join('') || '<div class="event-item">No events yet...</div>';
     }
 }
 

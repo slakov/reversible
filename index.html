@@ -219,6 +219,11 @@
                             data-tab="trajectory" id="tab-trajectory">
                         Sample Trajectory
                     </button>
+                    <button class="tab-button" role="tab" 
+                            aria-selected="false" aria-controls="animation" 
+                            data-tab="animation" id="tab-animation">
+                        Live Population Animation
+                    </button>
                 </div>
 
                 <div id="heatmap" class="tab-content active" role="tabpanel" 
@@ -247,6 +252,80 @@
                      aria-labelledby="tab-trajectory" aria-hidden="true">
                     <div id="trajectoryPlot" role="img" 
                          aria-label="Line plot showing sample trajectory through state space"></div>
+                </div>
+
+                <div id="animation" class="tab-content" role="tabpanel" 
+                     aria-labelledby="tab-animation" aria-hidden="true">
+                    <div class="animation-container">
+                        <div class="animation-header">
+                            <h3>Live Population Dynamics</h3>
+                            <div class="animation-controls">
+                                <button id="playPause" class="btn-animation">▶️ Play</button>
+                                <button id="resetAnimation" class="btn-animation">🔄 Reset</button>
+                                <div class="speed-control">
+                                    <label for="animationSpeed">Speed:</label>
+                                    <input type="range" id="animationSpeed" min="0.1" max="5" value="1" step="0.1">
+                                    <span id="speedValue">1.0x</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="animation-display">
+                            <canvas id="populationCanvas" width="800" height="600" 
+                                    role="img" aria-label="Real-time animation of population dynamics">
+                                Your browser doesn't support canvas. Please upgrade to see the live animation.
+                            </canvas>
+                            
+                            <div class="animation-info">
+                                <div class="population-counters">
+                                    <div class="counter red-counter">
+                                        <div class="counter-dot red-dot"></div>
+                                        <span class="counter-label">Red Population:</span>
+                                        <span id="redCount" class="counter-value">0</span>
+                                    </div>
+                                    <div class="counter blue-counter">
+                                        <div class="counter-dot blue-dot"></div>
+                                        <span class="counter-label">Blue Population:</span>
+                                        <span id="blueCount" class="counter-value">0</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="simulation-time">
+                                    <span class="time-label">Simulation Time:</span>
+                                    <span id="animationTime" class="time-value">0.00</span>
+                                </div>
+                                
+                                <div class="recent-events">
+                                    <h4>Recent Events</h4>
+                                    <div id="eventLog" class="event-log">
+                                        <div class="event-item">Ready to start simulation...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="animation-legend">
+                            <h4>Legend</h4>
+                            <div class="legend-items">
+                                <div class="legend-item">
+                                    <div class="legend-dot red-dot"></div>
+                                    <span>Red Population Members</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-dot blue-dot"></div>
+                                    <span>Blue Population Members</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-effect arrival-effect"></div>
+                                    <span>New Arrival</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-effect departure-effect"></div>
+                                    <span>Departure</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
